@@ -102,14 +102,15 @@ public class TcasesMojo extends AbstractMojo
           options.setOutDir( outDir);
           options.setTestDef( testDef==null? null : new File( inputDir, testDef));
           options.setOutFile( outFile==null? null : new File( outDir, outFile));
-          options.setJUnit( isJunit());
           options.setExtended( !isNewTests());
           options.setRandomSeed( getSeed());
+          options.setNewSeed( isNewSeed());
           options.setDefaultTupleSize( getTuples());
 
           File transformDef = getTransformDefFile();
           if( transformDef != null)
             {
+            options.setTransformType( Options.TransformType.CUSTOM);
             String projectTransformDef = getProjectFile( projectName, transformDef.getPath());
             if( projectTransformDef == null)
               {
@@ -120,6 +121,15 @@ public class TcasesMojo extends AbstractMojo
                 ? new File( projectTransformDef)
                 : new File( inputDir, projectTransformDef));
             }
+          else if( isJunit())
+            {
+            options.setTransformType( Options.TransformType.JUNIT);
+            }
+          else if( isHtml())
+            {
+            options.setTransformType( Options.TransformType.HTML);
+            }
+          
           options.setTransformParams( getTransformParams());
 
           // Generate test cases for this Tcases project.
@@ -324,6 +334,22 @@ public class TcasesMojo extends AbstractMojo
     }
 
   /**
+   * Changes if using the Html transform.
+   */
+  public void setHtml( boolean html)
+    {
+    this.html = html;
+    }
+
+  /**
+   * Returns if using the Html transform.
+   */
+  public boolean isHtml()
+    {
+    return html;
+    }
+
+  /**
    * Changes if previous contents of the test definition file are ignored.
    * If false, new test definitions are based on the previous test definitions.
    */
@@ -395,6 +421,22 @@ public class TcasesMojo extends AbstractMojo
   public Long getSeed()
     {
     return seed;
+    }
+
+  /**
+   * Changes if choosing a new random seed used by generators.
+   */
+  public void setNewSeed( boolean newSeed)
+    {
+    this.newSeed = newSeed;
+    }
+
+  /**
+   * Returns if choosing a new random seed used by generators.
+   */
+  public boolean isNewSeed()
+    {
+    return newSeed;
     }
 
   /**
@@ -542,6 +584,12 @@ public class TcasesMojo extends AbstractMojo
   private boolean junit;
 
   /**
+   * If true, generate test cases in the form of an HTML report.
+   */
+  @Parameter(property="html",defaultValue="false")
+  private boolean html;
+
+  /**
    * If true, ignore any initial test definitions. Otherwise, generate new test definitions
    * that extend the initial test definitions found in the file defined by the <B><CODE>testDef</CODE></B>
    * parameter.
@@ -555,6 +603,13 @@ public class TcasesMojo extends AbstractMojo
    */
   @Parameter(property="seed")
   private Long seed;
+
+  /**
+   * If true, choose a new random number for all generators. This updates the generator definitions specified
+   * by the <B><CODE>genDef</CODE></B> parameter.
+   */
+  @Parameter(property="newSeed",defaultValue="false")
+  private boolean newSeed;
 
   /**
    * If defined, use the given default tuple size for all generators. This updates the generator definitions specified

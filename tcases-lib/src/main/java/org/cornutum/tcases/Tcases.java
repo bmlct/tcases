@@ -50,10 +50,10 @@ public class Tcases
    * [-n]
    * [-o <I>outDir</I>]
    * [-p <I>name</I>=<I>value</I>]
-   * [-r <I>seed</I>]
+   * [-r <I>seed</I>] [-R]
    * [-t <I>testDef</I>]
    * [-v]
-   * [-x <I>transformDef</I> | -J]
+   * [-x <I>transformDef</I> | -J | -H]
    * [<I>inputDef</I>]
    * </NOBR>
    * </TD>
@@ -108,6 +108,18 @@ public class Tcases
    * by the given <I>genDef</I> file. If omitted, the default generator definition is used.
    * The default generator definition is read from the corresponding <CODE>*-Generators.xml</CODE> file in the same directory as the <I>inputDef</I>,
    * if it exists. Otherwise, the default {@link TupleGenerator} is used for all functions.
+   * </TD>
+   * </TR>
+   * 
+   * <TR valign="top">
+   * <TD>
+   * &nbsp;
+   * </TD>
+   * <TD>
+   * <NOBR>-H </NOBR>
+   * </TD>
+   * <TD>
+   * If <I>-H</I> is defined, test definition output is transformed into an HTML report. The resulting HTML file is written to the specified <I>outDir</I>.
    * </TD>
    * </TR>
    * 
@@ -216,6 +228,19 @@ public class Tcases
    * &nbsp;
    * </TD>
    * <TD>
+   * <NOBR>-R </NOBR>
+   * </TD>
+   * <TD>
+   * Choose a new random number seed for all generators. This updates the generator definitions specified by the
+   * <I>genDef</I> file.
+   * </TD>
+   * </TR>
+   * 
+   * <TR valign="top">
+   * <TD>
+   * &nbsp;
+   * </TD>
+   * <TD>
    * <NOBR>-x <I>transformDef</I> </NOBR>
    * </TD>
    * <TD>
@@ -278,6 +303,8 @@ public class Tcases
    */
   public static class Options
     {
+    public enum TransformType { HTML, JUNIT, CUSTOM };
+    
     /**
      * Creates a new Options object.
      */
@@ -372,6 +399,11 @@ public class Tcases
           }
         }
 
+      else if( arg.equals( "-R"))
+        {
+        setNewSeed( true);
+        }
+
       else if( arg.equals( "-c"))
         {
         i++;
@@ -396,19 +428,30 @@ public class Tcases
 
       else if( arg.equals( "-J"))
         {
-        if( getTransformDef() != null)
+        if( getTransformType() != null)
           {
-          throwUsageException( "Can't specify both -J and -x");
+          throwUsageException( "Can't specify multiple output transforms");
           }
-        setJUnit( true);
+        setTransformType( TransformType.JUNIT);
+        }
+
+      else if( arg.equals( "-H"))
+        {
+        if( getTransformType() != null)
+          {
+          throwUsageException( "Can't specify multiple output transforms");
+          }
+        setTransformType( TransformType.HTML);
         }
 
       else if( arg.equals( "-x"))
         {
-        if( isJUnit())
+        if( getTransformType() != null)
           {
-          throwUsageException( "Can't specify both -J and -x");
+          throwUsageException( "Can't specify multiple output transforms");
           }
+        setTransformType( TransformType.CUSTOM);
+
         i++;
         if( i >= args.length)
           {
@@ -502,9 +545,9 @@ public class Tcases
           + " [-n]"
           + " [-o outDir]"
           + " [-p name=value]"
-          + " [-r seed]"
+          + " [-r seed] [-R]"
           + " [-t testDef]"
-          + " [-x transformDef | -J]"
+          + " [-x transformDef | -J | -H]"
           + " [inputDef]",
           cause);
       }
@@ -590,19 +633,19 @@ public class Tcases
       }
 
     /**
-     * Changes if using the JUnit transform.
+     * Changes the output transform type.
      */
-    public void setJUnit( boolean junit)
+    public void setTransformType( TransformType transformType)
       {
-      junit_ = junit;
+      transformType_ = transformType;
       }
 
     /**
-     * Returns if using the JUnit transform.
+     * Returns the output transform type.
      */
-    public boolean isJUnit()
+    public TransformType getTransformType()
       {
-      return junit_;
+      return transformType_;
       }
 
     /**
@@ -668,7 +711,28 @@ public class Tcases
      */
     public Long getRandomSeed()
       {
+      if( seed_ == null && isNewSeed())
+        {
+        setRandomSeed( (long) (Math.random() * Long.MAX_VALUE));
+        }
+      
       return seed_;
+      }
+
+    /**
+     * Changes if choosing a new random seed used by generators.
+     */
+    public void setNewSeed( boolean newSeed)
+      {
+      newSeed_ = newSeed;
+      }
+
+    /**
+     * Returns if choosing a new random seed used by generators.
+     */
+    public boolean isNewSeed()
+      {
+      return newSeed_;
       }
 
     /**
@@ -764,6 +828,11 @@ public class Tcases
         builder.append( " -r ").append( getRandomSeed());
         }
 
+      if( isNewSeed())
+        {
+        builder.append( " -R");
+        }
+
       if( getTestDef() != null)
         {
         builder.append( " -t ").append( getTestDef().getPath());
@@ -779,9 +848,14 @@ public class Tcases
         builder.append( " -x ").append( getTransformDef().getPath());
         }
 
-      if( isJUnit())
+      if( getTransformType() == TransformType.JUNIT)
         {
         builder.append( " -J");
+        }
+
+      if( getTransformType() == TransformType.HTML)
+        {
+        builder.append( " -H");
         }
         
       return builder.toString();
@@ -794,9 +868,10 @@ public class Tcases
     private File genDef_;
     private File transformDef_;
     private Map<String,Object> transformParams_ = new HashMap<String,Object>();
-    private boolean junit_;
+    private TransformType transformType_;
     private boolean extended_;
     private Long seed_;
+    private boolean newSeed_;
     private Integer defaultTupleSize_;
     private File workingDir_;
     private boolean showVersion_;
@@ -912,11 +987,15 @@ public class Tcases
       // No, defaults to...
       outputFile =
         // ... JUnit test class file, if generating JUnit
-        options.isJUnit() && inputDefFile != null
-        ? new File( projectName.replaceAll( "\\W+", "") + "Test.java")
+        options.getTransformType() == Options.TransformType.JUNIT && inputDefFile != null
+        ? new File( projectName.replaceAll( "\\W+", "") + "Test.java") :
+
+        // ... HTML file, if generating HTML
+        options.getTransformType() == Options.TransformType.HTML && inputDefFile != null
+        ? new File( projectName + "-Test.htm") :
 
         // ... else test definition file.
-        : testDefFile;
+        testDefFile;
       }
     if( outputFile != null)
       {
@@ -1012,7 +1091,7 @@ public class Tcases
     SystemTestDef testDef = getTests( inputDef, genDef, baseDef, options);
 
     // Identify test definition transformations.
-    TransformFilter transformer = null;
+    AbstractFilter transformer = null;
     File transformDefFile = options.getTransformDef();
     if( transformDefFile != null)
       {
@@ -1020,11 +1099,15 @@ public class Tcases
         {
         transformDefFile = new File( inputDir, transformDefFile.getPath());
         }
-      transformer = new TransformFilter( transformDefFile);
+      transformer = new TransformFilter( transformDefFile, options.getTransformParams());
       }
-    else if( options.isJUnit())
+    else if( options.getTransformType() == Options.TransformType.JUNIT)
       {
-      transformer = new TestDefToJUnitFilter();
+      transformer = new TestDefToJUnitFilter( options.getTransformParams());
+      }
+    else if( options.getTransformType() == Options.TransformType.HTML)
+      {
+      transformer = new TestDefToHtmlFilter();
       }
     
     if( transformer != null)
@@ -1034,7 +1117,6 @@ public class Tcases
         throw new RuntimeException( "Transformed output will overwrite test definition file=" + baseDefFile);
         }
       transformer.setTarget( outputFile);
-      transformer.setParams( options.getTransformParams());
       }
 
     // Write new test definitions.

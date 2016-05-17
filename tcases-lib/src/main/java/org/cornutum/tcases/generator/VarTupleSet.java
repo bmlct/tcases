@@ -11,7 +11,7 @@ import org.cornutum.tcases.VarBindingDef;
 import org.cornutum.tcases.VarDef;
 import org.cornutum.tcases.util.ToString;
 
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.collections4.IteratorUtils;
 import org.apache.commons.collections4.Predicate;
 
@@ -69,7 +69,7 @@ public class VarTupleSet
       ? 0.0
 
       : (double)
-        CollectionUtils.countMatches
+        IterableUtils.countMatches
         ( unused_,
           new Predicate<Tuple>()
             {
@@ -123,7 +123,7 @@ public class VarTupleSet
     return
       getBinds
       ( IteratorUtils.filteredIterator
-        ( used_.iterator(),
+        ( getUsed(),
           new Predicate<Tuple>()
             {
             public boolean evaluate( Tuple tuple)
@@ -202,10 +202,13 @@ public class VarTupleSet
    */
   public void used( final TestCaseDef testCase)
     {
+    // Note: must accumulate tuples into a separate list to avoid ConcurrentModificationException when updating used/unused membership.
     List<Tuple> usedTuples =
       IteratorUtils.toList
       ( IteratorUtils.filteredIterator
-        ( unused_.iterator(),
+        ( IteratorUtils.chainedIterator
+          ( unused_.iterator(),
+            used_.iterator()),
           new Predicate<Tuple>()
             {
             public boolean evaluate( Tuple tuple)
